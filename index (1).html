@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Клавіатурний пазл</title>
+<style>
+:root{
+  --bg:#eef3fb; --ink:#1b2b3b; --muted:#5d7189; --card:#ffffff;
+  --case:#cfdaec; --case-edge:#aebcd3; --slot:#b7c5dc; --slot-line:#7f93b3; --slot-text:#5b7194;
+  --key:#ffffff; --key-edge:#c2cfe0; --mod:#dce8f8;
+  --green:#5fd39b; --yellow:#ffc94a; --coral:#ff7f6e; --sky:#4fa8ff; --violet:#a98bff;
+  --u:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",Verdana,sans-serif;min-height:100vh;
+  background-image:radial-gradient(circle at 8% 10%,#ffe3dc 0,transparent 32%),
+                   radial-gradient(circle at 92% 12%,#d9ecff 0,transparent 34%),
+                   radial-gradient(circle at 85% 95%,#e6dcff 0,transparent 32%),
+                   radial-gradient(circle at 10% 92%,#d8f6e6 0,transparent 30%);
+  background-attachment:fixed;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.hidden{display:none!important}
+
+/* ---------- меню ---------- */
+#menu{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.menu-card{width:min(580px,100%);background:var(--card);border-radius:26px;padding:30px 28px 32px;
+  box-shadow:0 8px 0 #d3deef,0 26px 50px rgba(60,90,140,.18)}
+.menu-card h1{margin:0;font-size:clamp(28px,6vw,40px)}
+.menu-card p{margin:6px 0 22px;color:var(--muted);font-size:17px}
+.menu-card h2{margin:0 0 10px;font-size:16px;color:var(--muted);font-weight:700}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.seg button{border:0;border-radius:14px;padding:15px 10px;background:#eaf0f9;color:var(--ink);
+  font-size:19px;font-weight:800;box-shadow:0 4px 0 #c9d6e8;transition:transform .08s}
+.seg button[aria-pressed="true"]{background:var(--sky);color:#fff;box-shadow:0 4px 0 #2d83d6}
+.seg button:active{transform:translateY(3px)}
+.diffs{display:grid;gap:12px}
+.diff{display:flex;align-items:center;gap:14px;text-align:left;border:0;border-radius:16px;padding:14px 16px;
+  color:var(--ink);transition:transform .08s,box-shadow .08s}
+.diff.easy{background:#dcf7ea;box-shadow:0 5px 0 #aee6cb}
+.diff.medium{background:#fff1c9;box-shadow:0 5px 0 #f1d98a}
+.diff.hard{background:#ffe0da;box-shadow:0 5px 0 #f5b8ad}
+.diff:hover{transform:translateY(-2px)}
+.diff:active{transform:translateY(4px);box-shadow:none}
+.diff .dot{flex:none;width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:24px;line-height:1;color:#fff}
+.diff.easy .dot{background:var(--green)} .diff.medium .dot{background:#f2b100} .diff.hard .dot{background:var(--coral)}
+.diff b{display:block;font-size:19px}
+.diff .d{display:block;font-size:14px;color:#4a5c6e;margin-top:2px;line-height:1.3}
+
+/* ---------- гра ---------- */
+#game{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 12px 24px}
+.bar{display:flex;align-items:center;gap:12px;margin-bottom:8px;max-width:100%}
+.bar .home{flex:none;border:0;border-radius:12px;width:44px;height:44px;background:#fff;color:var(--ink);font-size:21px;box-shadow:0 4px 0 #c9d6e8}
+.bar .home:active{transform:translateY(3px);box-shadow:none}
+.chip{background:#fff;border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;color:var(--muted);white-space:nowrap;box-shadow:0 2px 0 #d3deef}
+.prog{flex:1;display:flex;align-items:center;gap:10px;min-width:0}
+.track{flex:1;height:12px;background:#d9e3f2;border-radius:99px;overflow:hidden}
+.fill{height:100%;width:0;background:linear-gradient(90deg,#4cd48a,#ffc93a 55%,#ff6a00);background-size:100% 100%;background-repeat:no-repeat;border-radius:99px;transition:width .25s,background-size .25s}
+.count{font-weight:800;font-size:18px;min-width:64px;text-align:right}
+.note{margin:10px 0 0;color:var(--muted);font-size:14px;text-align:center}
+
+.stage{position:relative;margin:0 auto}
+.board{position:absolute;background:var(--case);border-radius:18px;padding:calc(var(--u)*.22);
+  box-shadow:0 8px 0 var(--case-edge),0 22px 36px rgba(60,90,140,.25)}
+.row{display:flex}
+.slot{width:calc(var(--u)*var(--w) - 6px);height:calc(var(--u) - 6px);margin:3px;border-radius:9px;flex:none;
+  display:grid;place-items:center;font-weight:800;font-size:calc(var(--u)*.38);color:var(--slot-text)}
+.slot.mod{font-size:calc(var(--u)*.25)}
+.slot.empty{background:var(--slot);border:2px dashed var(--slot-line);transition:background .1s,border-color .1s}
+.slot.ghost::after{content:attr(data-d)}
+.slot.hot{border-color:var(--sky);background:#a6c4ee}
+.slot.filled{padding:0}
+
+.key{width:calc(var(--u)*var(--w) - 6px);height:calc(var(--u) - 6px);margin:3px;border-radius:9px;flex:none;
+  background:var(--kc,var(--key));color:var(--ink);font-weight:800;font-size:calc(var(--u)*.38);
+  display:grid;place-items:center;user-select:none;-webkit-user-select:none;touch-action:none;
+  box-shadow:0 4px 0 var(--ke,var(--key-edge));transform:rotate(var(--r,0deg));transition:transform .1s}
+.key.mod{--kc:var(--mod);font-size:calc(var(--u)*.25)}
+.key.scatter{position:absolute;margin:0;cursor:grab;z-index:2;box-shadow:0 4px 0 var(--ke),0 9px 12px rgba(60,90,140,.25)}
+.key.scatter:hover{transform:rotate(var(--r,0deg)) translateY(-3px)}
+.key.drag{position:fixed;margin:0;z-index:50;cursor:grabbing;transform:scale(1.1) rotate(-2deg);
+  box-shadow:0 6px 0 var(--ke),0 18px 26px rgba(60,90,140,.35);transition:none}
+.key.placed{position:static;margin:0;width:100%;height:100%;cursor:default;--r:0deg;box-shadow:0 3px 0 var(--ke,var(--key-edge));animation:pop .28s ease-out}
+.key.fixed{animation:none}
+.key.shake{animation:shake .35s}
+@keyframes pop{0%{transform:scale(1.25)}60%{transform:scale(.94)}100%{transform:scale(1)}}
+@keyframes shake{20%{transform:translateX(-7px)}50%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
+
+/* ---------- інфо ---------- */
+.info-btn,.snd-btn{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:#fff;color:var(--sky);
+  font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;font-size:24px;line-height:1;
+  box-shadow:0 4px 0 #c9d6e8}
+.snd-btn{font-family:inherit;font-style:normal;font-size:20px}
+.info-btn:active,.snd-btn:active{transform:translateY(3px);box-shadow:none}
+.menu-card{position:relative}
+.menu-card .info-btn{position:absolute;top:18px;right:18px}
+.menu-card .snd-btn{position:absolute;top:18px;right:70px}
+.menu-card h1{padding-right:120px}
+#info{position:fixed;inset:0;background:rgba(40,60,90,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:120}
+.i-card{position:relative;background:#fff;border-radius:26px;padding:0 0 26px;max-width:480px;width:100%;overflow:hidden;
+  box-shadow:0 8px 0 #d3deef,0 30px 60px rgba(40,60,90,.35);animation:pop .3s ease-out}
+.i-head{display:flex;align-items:center;gap:14px;padding:22px 28px 18px;
+  background:linear-gradient(120deg,#e3f1ff,#efe6ff 55%,#ffe9e3)}
+.i-badge{flex:none;width:48px;height:48px;border-radius:14px;background:var(--sky);color:#fff;display:grid;place-items:center;
+  font-family:Georgia,serif;font-style:italic;font-weight:700;font-size:28px;box-shadow:0 4px 0 #2d83d6}
+.i-head h2{margin:0;font-size:26px;line-height:1.1}
+.i-head span{display:block;color:var(--muted);font-size:14px;margin-top:3px}
+.i-body{padding:18px 28px 0}
+.i-body p{margin:0 0 12px;color:#3c5068;font-size:16px;line-height:1.55}
+.lv{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 14px}
+.lv span{border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700;color:var(--ink)}
+.lv .e{background:#dcf7ea}.lv .m{background:#fff1c9}.lv .h{background:#ffe0da}
+.i-links{display:grid;gap:10px;margin:16px 0 18px}
+.i-links a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:#f3f7fd;color:var(--ink);
+  font-weight:800;text-decoration:none;box-shadow:0 3px 0 #dbe5f3;transition:transform .08s}
+.i-links a:hover{transform:translateY(-2px);background:#eaf3ff}
+.i-links a i{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-style:normal;font-size:20px}
+.i-links a:nth-child(1) i{background:#ffd466}.i-links a:nth-child(2) i{background:#bda6ff}
+.i-links a small{display:block;font-weight:600;color:var(--muted);font-size:13px;margin-top:2px;word-break:break-all}
+.i-close{display:block;margin:0 auto;border:0;border-radius:14px;padding:12px 30px;background:var(--sky);color:#fff;font-size:17px;font-weight:800;box-shadow:0 4px 0 #2d83d6}
+.i-close:active{transform:translateY(3px);box-shadow:none}
+
+/* ---------- перемога ---------- */
+#victory{position:fixed;inset:0;background:rgba(40,60,90,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.v-card{background:#fff;border-radius:26px;padding:30px 34px;text-align:center;max-width:420px;width:100%;
+  box-shadow:0 8px 0 #d3deef;animation:pop .4s ease-out}
+.v-card h2{margin:0 0 6px;font-size:32px}
+.v-card p{margin:0 0 14px;color:var(--muted);font-size:17px;line-height:1.4}
+.stars{font-size:46px;letter-spacing:6px;margin-bottom:16px}
+.stars i{font-style:normal;color:#dbe4f1}.stars i.on{color:var(--yellow);animation:pop .4s ease-out both}
+.stars i:nth-child(2){animation-delay:.15s}.stars i:nth-child(3){animation-delay:.3s}
+.again{border:0;border-radius:14px;padding:14px 26px;background:var(--green);color:#0f3b27;font-size:18px;font-weight:800;box-shadow:0 5px 0 #38a874}
+.again:active{transform:translateY(4px);box-shadow:none}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:200}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ======== МЕНЮ ======== -->
+<main id="menu">
+  <div class="menu-card">
+    <button class="snd-btn" type="button" data-snd aria-label="Звук">&#128266;</button>
+    <button class="info-btn" type="button" data-info aria-label="Про гру">i</button>
+    <h1>Клавіатурний пазл</h1>
+    <p>Деякі клавіші розлетілися. Поверни їх на місця!</p>
+
+    <h2>Розкладка</h2>
+    <div class="seg" id="layoutSeg">
+      <button type="button" data-layout="uk" aria-pressed="true">Українська</button>
+      <button type="button" data-layout="en" aria-pressed="false">Англійська</button>
+    </div>
+
+    <h2>Складність</h2>
+    <div class="diffs">
+      <button class="diff easy" type="button" data-diff="easy">
+        <span class="dot">&#127793;</span>
+        <span><b>Легко</b><span class="d">На порожніх місцях видно підказку</span></span>
+      </button>
+      <button class="diff medium" type="button" data-diff="medium">
+        <span class="dot">&#9889;</span>
+        <span><b>Середньо</b><span class="d">Підказка з’являється, коли підносиш клавішу до місця</span></span>
+      </button>
+      <button class="diff hard" type="button" data-diff="hard">
+        <span class="dot">&#128293;</span>
+        <span><b>Складно</b><span class="d">Жодних підказок</span></span>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- ======== ГРА ======== -->
+<section id="game" class="hidden">
+  <div class="bar" id="bar">
+    <button class="home" type="button" id="homeBtn" aria-label="До меню">&#8962;</button>
+    <span class="chip" id="modeChip"></span>
+    <div class="prog">
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <div class="count"><span id="placed">0</span> / <span id="total">0</span></div>
+    </div>
+    <button class="snd-btn" type="button" data-snd aria-label="Звук">&#128266;</button>
+    <button class="info-btn" type="button" data-info aria-label="Про гру">i</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="board" id="board"></div>
+  </div>
+  <p class="note">Перетягни клавіші на порожні місця</p>
+</section>
+
+<!-- ======== ПЕРЕМОГА ======== -->
+<div id="victory" class="hidden" role="dialog" aria-modal="true" aria-labelledby="vt">
+  <div class="v-card">
+    <h2 id="vt">Клавіатуру зібрано!</h2>
+    <p id="vtext"></p>
+    <div class="stars" id="stars"><i>&#9733;</i><i>&#9733;</i><i>&#9733;</i></div>
+    <button class="again" type="button" id="againBtn">Грати ще раз</button>
+  </div>
+</div>
+<div id="info" class="hidden" role="dialog" aria-modal="true" aria-labelledby="it">
+  <div class="i-card">
+    <div class="i-head">
+      <div class="i-badge">i</div>
+      <div><h2 id="it">Про гру</h2><span>Клавіатурний пазл</span></div>
+    </div>
+    <div class="i-body">
+      <p>Це проста гра, яка допомагає запам’ятати, де на клавіатурі яка клавіша. Кілька клавіш розлетілися, і твоє завдання повернути їх на свої місця.</p>
+      <div class="i-links">
+        <a href="https://itnauka.org/#digital-literacy" target="_blank" rel="noopener"><i>🧩</i><span>Комп’ютерна наука з паном Артемом<small>Освітні ІТ сервіси</small></span></a>
+        <a href="https://github.com/whyuxavier" target="_blank" rel="noopener"><i>💻</i><span>GitHub автора<small>github.com/whyuxavier</small></span></a>
+      </div>
+      <button class="i-close" type="button" id="infoClose">Зрозуміло</button>
+    </div>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+(function(){
+  const L = s => [...s].map(c => [c,1]);
+  const bottom = [["Ctrl",2],["Alt",2],["Space",7],["Alt",2],["Ctrl",2]];
+  const LAYOUTS = {
+    en:[
+      [...L("`1234567890-="),["Backspace",2]],
+      [["Tab",1.5],...L("qwertyuiop[]"),["\\",1.5]],
+      [["Caps",1.75],...L("asdfghjkl;'"),["Enter",2.25]],
+      [["Shift",2.25],...L("zxcvbnm,./"),["Shift",2.75]],
+      bottom],
+    uk:[
+      [...L("'1234567890-="),["Backspace",2]],
+      [["Tab",1.5],...L("йцукенгшщзхї"),["ґ",1.5]],
+      [["Caps",1.75],...L("фівапролджє"),["Enter",2.25]],
+      [["Shift",2.25],...L("ячсмитьбю."),["Shift",2.75]],
+      bottom]
+  };
+  const COUNTS = {easy:20, medium:18, hard:16};
+  const MAX_DIGITS = {easy:2, medium:2, hard:1};
+  let t0 = 0;
+  const DIFF_NAMES = {easy:"Легко",medium:"Середньо",hard:"Складно"};
+  const LAYOUT_NAMES = {uk:"Українська",en:"Англійська"};
+  const COLORS = [["#ff9a8c","#e0705f"],["#ffd466","#e0ac22"],["#7fe0ae","#43b57f"],["#7dbcff","#3f8fe0"],["#bda6ff","#8b6fe0"]];
+
+  const $ = id => document.getElementById(id);
+  const stage = $("stage"), board = $("board");
+  let layout = "uk", diff = "easy", placed = 0, total = 0, mistakes = 0, slots = [];
+  const rnd = (a,b) => a + Math.random() * (b - a);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i],a[j]] = [a[j],a[i]]; } return a; };
+  const disp = c => c.length === 1 ? c.toUpperCase() : c;
+
+  /* ---- звуки (WebAudio, без файлів) ---- */
+  let ac = null, muted = false;
+  function tone(f, d, type, vol, delay, to){
+    if (muted) return;
+    try{
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+      const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || "sine"; o.frequency.setValueAtTime(f, t);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, t + d);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol || .12, t + .012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + d + .03);
+    }catch(err){}
+  }
+  const sfx = {
+    drop:  () => tone(300, .08, "triangle", .08, 0, 220),
+    ok:    () => { tone(660, .12, "sine", .13); tone(990, .2, "sine", .13, .09); },
+    bad:   () => tone(210, .25, "sawtooth", .07, 0, 110),
+    win:   () => { [523,659,784,1047].forEach((f,i) => tone(f, .22, "triangle", .13, i * .12)); tone(1319, .5, "sine", .13, .5); }
+  };
+  document.querySelectorAll("[data-snd]").forEach(b => b.onclick = () => {
+    muted = !muted;
+    document.querySelectorAll("[data-snd]").forEach(x => x.innerHTML = muted ? "&#128263;" : "&#128266;");
+  });
+
+  /* ---- меню ---- */
+  document.querySelectorAll("#layoutSeg button").forEach(b => b.onclick = () => {
+    layout = b.dataset.layout;
+    document.querySelectorAll("#layoutSeg button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+  document.querySelectorAll(".diff").forEach(b => b.onclick = () => start(b.dataset.diff));
+  const info = $("info");
+  document.querySelectorAll("[data-info]").forEach(b => b.onclick = () => info.classList.remove("hidden"));
+  $("infoClose").onclick = () => info.classList.add("hidden");
+  info.addEventListener("click", e => { if (e.target === info) info.classList.add("hidden"); });
+  addEventListener("keydown", e => { if (e.key === "Escape") info.classList.add("hidden"); });
+  $("homeBtn").onclick = toMenu;
+  $("againBtn").onclick = toMenu;
+  function toMenu(){
+    $("victory").classList.add("hidden");
+    $("game").classList.add("hidden");
+    $("menu").classList.remove("hidden");
+  }
+
+  /* ---- побудова гри ---- */
+  function start(d){
+    diff = d; placed = 0; mistakes = 0; slots = [];
+    stage.querySelectorAll(".key").forEach(k => k.remove());
+    board.innerHTML = "";
+    const all = [];
+    LAYOUTS[layout].forEach(row => {
+      const r = document.createElement("div"); r.className = "row";
+      row.forEach(([c,w]) => {
+        const s = document.createElement("div");
+        s.className = "slot" + (c.length > 1 ? " mod" : "");
+        s.style.setProperty("--w", w);
+        s.dataset.l = c; s.dataset.w = w; s.dataset.d = disp(c);
+        r.appendChild(s); slots.push(s);
+        all.push(s);
+      });
+      board.appendChild(r);
+    });
+    // клавіші, які можуть розлетітися: лише літери й цифри
+    const isDigit = s => /^\p{N}$/u.test(s.dataset.l);
+    const letters = shuffle(all.filter(s => /^\p{L}$/u.test(s.dataset.l)));
+    const digits = shuffle(all.filter(isDigit));
+    const nd = Math.floor(Math.random() * (MAX_DIGITS[diff] + 1));
+    const chosen = new Set(digits.slice(0, nd).concat(letters.slice(0, COUNTS[diff] - nd)));
+    all.forEach(s => {
+      const k = document.createElement("div");
+      k.className = "key" + (s.dataset.l.length > 1 ? " mod" : "");
+      k.style.setProperty("--w", s.dataset.w);
+      k.dataset.l = s.dataset.l; k.dataset.w = s.dataset.w;
+      k.textContent = disp(s.dataset.l);
+      if (chosen.has(s)){
+        const col = COLORS[Math.floor(Math.random() * COLORS.length)];
+        k.style.setProperty("--kc", col[0]); k.style.setProperty("--ke", col[1]);
+        k.classList.add("scatter");
+        k.addEventListener("pointerdown", onDown);
+        s.classList.add("empty");
+        if (diff === "easy") s.classList.add("ghost");
+        stage.appendChild(k);
+      } else {
+        k.classList.add("placed","fixed");
+        s.classList.add("filled");
+        s.appendChild(k);
+      }
+    });
+    total = chosen.size;
+    $("total").textContent = total;
+    $("modeChip").textContent = LAYOUT_NAMES[layout] + " · " + DIFF_NAMES[diff];
+    updateProgress();
+    $("menu").classList.add("hidden");
+    $("victory").classList.add("hidden");
+    $("game").classList.remove("hidden");
+    layoutStage(true);
+    t0 = Date.now();
+  }
+  function updateProgress(){
+    $("placed").textContent = placed;
+    const pct = placed / total * 100;
+    $("fill").style.width = pct + "%";
+    $("fill").style.backgroundSize = (pct ? 10000 / pct : 100) + "% 100%";
+  }
+
+  /* ---- розташування: клавіатура по центру, клавіші навколо ---- */
+  function layoutStage(){
+    const vw = innerWidth, vh = innerHeight;
+    const side = 2.7;
+    const uWide = (vw - 24) / (15.44 + 2 * side);
+    const wide = uWide >= 34;
+    let u = wide ? Math.min(58, uWide, (vh - 130) / 6.9) : Math.min(58, (vw - 24) / 15.44);
+    u = Math.floor(Math.max(20, u));
+    document.documentElement.style.setProperty("--u", u + "px");
+
+    const boardW = 15.44 * u, boardH = 5.44 * u;
+    const keys = [...stage.querySelectorAll(".key.scatter")];
+    const n = keys.length;
+    let W, H, boardX, boardY;
+    const cells = [];
+
+    if (wide){
+      const perSide = Math.ceil(n / 2), rows = Math.ceil(perSide / 2);
+      const cw = 1.25 * u, ch = 1.2 * u;
+      W = boardW + 2 * side * u;
+      H = Math.max(boardH + u, rows * ch + .5 * u);
+      boardX = side * u; boardY = (H - boardH) / 2;
+      const top0 = (H - rows * ch - .3 * u) / 2;
+      [0,1].forEach(sd => {
+        const x0 = sd === 0 ? .1 * u : W - side * u + .15 * u;
+        for (let i = 0; i < perSide; i++){
+          const col = i % 2, row = Math.floor(i / 2);
+          cells.push([x0 + col * cw, top0 + row * ch + (col ? .3 * u : 0)]);
+        }
+      });
+    } else {
+      W = boardW; boardX = 0; boardY = 0;
+      const cols = Math.max(2, Math.floor(W / (1.2 * u))), cw = W / cols, ch = 1.25 * u;
+      const rows = Math.ceil(n / cols);
+      const y0 = boardH + .7 * u;
+      H = y0 + rows * ch + .2 * u;
+      for (let i = 0; i < n; i++) cells.push([(i % cols) * cw + (cw - u) / 2, y0 + Math.floor(i / cols) * ch]);
+    }
+    stage.style.width = W + "px"; stage.style.height = H + "px";
+    $("bar").style.width = Math.min(W, vw - 24) + "px";
+    board.style.left = boardX + "px"; board.style.top = boardY + "px";
+
+    // у широкому режимі половина клавіш ліворуч, половина праворуч
+    const sel = wide ? cells.slice() : cells;
+    shuffle(sel);
+    keys.forEach((k, i) => {
+      const c = sel[i] || [0,0];
+      const x = c[0] + rnd(-.12, .12) * u, y = c[1] + rnd(-.1, .1) * u;
+      k._l = x; k._t = y;
+      k.style.left = x + "px"; k.style.top = y + "px";
+      k.style.setProperty("--r", rnd(-16, 16).toFixed(1) + "deg");
+    });
+  }
+  let rt;
+  addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { if (!$("game").classList.contains("hidden")) layoutStage(); }, 150);
+  });
+
+  /* ---- перетягування ---- */
+  let cur = null, offX = 0, offY = 0, hot = null;
+  function onDown(e){
+    const k = e.currentTarget;
+    if (cur) return;
+    e.preventDefault();
+    const r = k.getBoundingClientRect();
+    cur = k; offX = e.clientX - r.left; offY = e.clientY - r.top;
+    k.style.width = k.offsetWidth + "px"; k.style.height = k.offsetHeight + "px";
+    k.classList.add("drag");
+    document.body.appendChild(k);
+    move(e.clientX, e.clientY);
+    addEventListener("pointermove", onMove);
+    addEventListener("pointerup", onUp);
+    addEventListener("pointercancel", onUp);
+  }
+  function move(x, y){
+    cur.style.left = (x - offX) + "px";
+    cur.style.top = (y - offY) + "px";
+    const r = cur.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let best = null, bd = 1e9;
+    slots.forEach(s => {
+      if (!s.classList.contains("empty") || s.classList.contains("filled")) return;
+      const b = s.getBoundingClientRect(), p = 4;
+      if (cx >= b.left - p && cx <= b.right + p && cy >= b.top - p && cy <= b.bottom + p){
+        const d = Math.hypot(cx - (b.left + b.width / 2), cy - (b.top + b.height / 2));
+        if (d < bd){ bd = d; best = s; }
+      }
+    });
+    if (best !== hot){
+      if (hot){ hot.classList.remove("hot"); if (diff === "medium") hot.classList.remove("ghost"); }
+      hot = best;
+      if (hot){ hot.classList.add("hot"); if (diff === "medium") hot.classList.add("ghost"); }
+    }
+  }
+  function onMove(e){ if (cur) move(e.clientX, e.clientY); }
+  function onUp(){
+    removeEventListener("pointermove", onMove);
+    removeEventListener("pointerup", onUp);
+    removeEventListener("pointercancel", onUp);
+    const k = cur, s = hot; cur = null; hot = null;
+    if (!k) return;
+    k.classList.remove("drag");
+    k.style.width = k.style.height = "";
+    if (s){ s.classList.remove("hot"); if (diff === "medium") s.classList.remove("ghost"); }
+    if (s && s.dataset.l === k.dataset.l && s.dataset.w === k.dataset.w){
+      s.classList.add("filled"); s.classList.remove("ghost","empty");
+      k.classList.remove("scatter"); k.style.left = k.style.top = ""; k.style.removeProperty("--r");
+      k.removeEventListener("pointerdown", onDown);
+      s.appendChild(k); k.classList.add("placed");
+      sfx.ok();
+      placed++; updateProgress();
+      if (placed === total) setTimeout(win, 350);
+    } else {
+      if (s){ mistakes++; sfx.bad(); } else sfx.drop();
+      stage.appendChild(k);
+      k.style.left = k._l + "px"; k.style.top = k._t + "px";
+      k.classList.add("shake");
+      setTimeout(() => k.classList.remove("shake"), 380);
+    }
+  }
+
+  /* ---- перемога ---- */
+  function win(){
+    const stars = mistakes <= 5 ? 3 : mistakes <= 15 ? 2 : 1;
+    document.querySelectorAll("#stars i").forEach((s, i) => s.classList.toggle("on", i < stars));
+    const sec = Math.round((Date.now() - t0) / 1000), m = Math.floor(sec / 60), ss = sec % 60;
+    const time = (m ? m + " хв " : "") + ss + " с";
+    $("vtext").innerHTML = "Клавіатуру зібрано за <b>" + time + "</b><br>" + (mistakes === 0
+      ? "Жодної помилки. Ідеально!"
+      : "Помилок: " + mistakes + "<br>Спробуй ще раз і зроби менше!");
+    $("victory").classList.remove("hidden");
+    sfx.win();
+    confetti();
+  }
+  function confetti(){
+    const c = $("confetti"), x = c.getContext("2d");
+    c.width = innerWidth; c.height = innerHeight;
+    const cols = COLORS.map(a => a[0]).concat(["#4fa8ff"]);
+    const ps = Array.from({length:110}, () => ({
+      x: Math.random() * c.width, y: -20 - Math.random() * c.height * .5,
+      vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4,
+      s: 6 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3,
+      c: cols[Math.floor(Math.random() * cols.length)]}));
+    let t = 0;
+    (function frame(){
+      x.clearRect(0, 0, c.width, c.height);
+      ps.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        x.save(); x.translate(p.x, p.y); x.rotate(p.r); x.fillStyle = p.c;
+        x.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); x.restore();
+      });
+      if (++t < 220) requestAnimationFrame(frame); else x.clearRect(0, 0, c.width, c.height);
+    })();
+  }
+})();
+</script>
+</body>
+</html>
