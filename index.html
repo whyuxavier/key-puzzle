@@ -80,7 +80,8 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
   display:grid;place-items:center;user-select:none;-webkit-user-select:none;touch-action:none;
   box-shadow:0 4px 0 var(--ke,var(--key-edge));transform:rotate(var(--r,0deg));transition:transform .1s}
 .key.mod{--kc:var(--mod);font-size:calc(var(--u)*.25)}
-.key.scatter{position:absolute;margin:0;cursor:grab;z-index:2;box-shadow:0 4px 0 var(--ke),0 9px 12px rgba(60,90,140,.25)}
+.key.scatter{position:absolute;margin:0;cursor:grab;z-index:2;box-shadow:0 4px 0 var(--ke),0 9px 12px rgba(60,90,140,.25);
+  width:calc(var(--tu,var(--u))*var(--w) - 6px);height:calc(var(--tu,var(--u)) - 6px);font-size:calc(var(--tu,var(--u))*.42)}
 .key.scatter:hover{transform:rotate(var(--r,0deg)) translateY(-3px)}
 .key.drag{position:fixed;margin:0;z-index:50;cursor:grabbing;transform:scale(1.1) rotate(-2deg);
   box-shadow:0 6px 0 var(--ke),0 18px 26px rgba(60,90,140,.35);transition:none}
@@ -137,6 +138,20 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
 .again:active{transform:translateY(4px);box-shadow:none}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:200}
 
+@media (max-width:560px){
+  #game{justify-content:flex-start;padding:10px 8px 16px}
+  .bar{gap:8px}
+  #modeChip{display:none}
+  .count{min-width:52px;font-size:16px}
+}
+@media (max-height:500px){
+  #game{justify-content:flex-start;padding:6px 8px 8px}
+  .bar{margin-bottom:4px}
+  .note{display:none}
+}
+.rot{display:none;align-items:center;justify-content:center;gap:8px;margin:12px 0 0;color:var(--muted);font-size:14px;font-weight:700}
+.rot svg{width:28px;height:28px;flex:none}
+@media (max-width:560px) and (orientation:portrait){.rot{display:flex}.note{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -190,6 +205,7 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
     <div class="board" id="board"></div>
   </div>
   <p class="note">Перетягни клавіші на порожні місця</p>
+  <p class="rot"><svg viewBox="0 0 32 32" fill="none" stroke="#5d7189" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="14" height="24" rx="3"/><path d="M27 18a11 11 0 0 1-9 10.5M18 28.5l3-2.5M18 28.5l2.5 3"/></svg>Поверни телефон — клавіші стануть більшими</p>
 </section>
 
 <!-- ======== ПЕРЕМОГА ======== -->
@@ -361,18 +377,23 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
 
   /* ---- розташування: клавіатура по центру, клавіші навколо ---- */
   function layoutStage(){
-    const vw = innerWidth, vh = innerHeight;
-    const side = 2.7;
+    // спершу стискаємо сцену, щоб телефон не «розтягнув» сторінку під велику клавіатуру
+    document.documentElement.style.setProperty("--u", "10px");
+    stage.style.setProperty("--tu", "10px");
+    stage.style.width = stage.style.height = "0px"; $("bar").style.width = "";
+    const vw = document.documentElement.clientWidth || innerWidth, vh = innerHeight;
+    const side = 2.7, short = vh <= 500;
+    const top = short ? 62 : 130;
     const uWide = (vw - 24) / (15.44 + 2 * side);
-    const wide = uWide >= 34;
-    let u = wide ? Math.min(58, uWide, (vh - 130) / 6.9) : Math.min(58, (vw - 24) / 15.44);
+    const wide = uWide >= 30 || (vw > vh && uWide >= 22);
+    let u = wide ? Math.min(58, uWide, (vh - top) / 6.9) : Math.min(58, (vw - 16) / 15.44);
     u = Math.floor(Math.max(20, u));
     document.documentElement.style.setProperty("--u", u + "px");
 
     const boardW = 15.44 * u, boardH = 5.44 * u;
     const keys = [...stage.querySelectorAll(".key.scatter")];
     const n = keys.length;
-    let W, H, boardX, boardY;
+    let W, H, boardX, boardY, tu = u;
     const cells = [];
 
     if (wide){
@@ -390,26 +411,41 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
         }
       });
     } else {
+      // телефон: клавіатура зверху, великі клавіші-пазли знизу
       W = boardW; boardX = 0; boardY = 0;
-      const cols = Math.max(2, Math.floor(W / (1.2 * u))), cw = W / cols, ch = 1.25 * u;
-      const rows = Math.ceil(n / cols);
-      const y0 = boardH + .7 * u;
+      const y0 = boardH + .6 * u;
+      const room = vh - 150 - y0;                       // місце під клавіатурою
+      tu = Math.min(58, Math.max(u * 1.4, 40));
+      let cols, rows;
+      for (;;){
+        cols = Math.max(3, Math.floor(W / (tu * 1.12)));
+        rows = Math.ceil(n / cols);
+        if (rows * tu * 1.15 <= room || tu <= 34) break;
+        tu -= 2;
+      }
+      const cw = W / cols, ch = tu * 1.15;
       H = y0 + rows * ch + .2 * u;
-      for (let i = 0; i < n; i++) cells.push([(i % cols) * cw + (cw - u) / 2, y0 + Math.floor(i / cols) * ch]);
+      for (let i = 0; i < n; i++){
+        const r = Math.floor(i / cols), inRow = Math.min(cols, n - r * cols);
+        const pad = (W - inRow * cw) / 2;                  // неповний ряд — по центру
+        cells.push([pad + (i % cols) * cw + (cw - tu) / 2, y0 + r * ch]);
+      }
     }
+    tu = Math.floor(tu);
+    stage.style.setProperty("--tu", tu + "px");
     stage.style.width = W + "px"; stage.style.height = H + "px";
-    $("bar").style.width = Math.min(W, vw - 24) + "px";
+    $("bar").style.width = Math.min(Math.max(W, 300), vw - 16) + "px";
     board.style.left = boardX + "px"; board.style.top = boardY + "px";
 
-    // у широкому режимі половина клавіш ліворуч, половина праворуч
-    const sel = wide ? cells.slice() : cells;
+    const sel = cells.slice();
     shuffle(sel);
+    const jitter = wide ? 1 : .35;
     keys.forEach((k, i) => {
       const c = sel[i] || [0,0];
-      const x = c[0] + rnd(-.12, .12) * u, y = c[1] + rnd(-.1, .1) * u;
+      const x = c[0] + rnd(-.12, .12) * u * jitter, y = c[1] + rnd(-.1, .1) * u * jitter;
       k._l = x; k._t = y;
       k.style.left = x + "px"; k.style.top = y + "px";
-      k.style.setProperty("--r", rnd(-16, 16).toFixed(1) + "deg");
+      k.style.setProperty("--r", (rnd(-16, 16) * (wide ? 1 : .5)).toFixed(1) + "deg");
     });
   }
   let rt;
@@ -426,6 +462,7 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
     e.preventDefault();
     const r = k.getBoundingClientRect();
     cur = k; offX = e.clientX - r.left; offY = e.clientY - r.top;
+    if (e.pointerType === "touch"){ offX = r.width / 2; offY = r.height + 14; }   // клавіша над пальцем, щоб її було видно
     k.style.width = k.offsetWidth + "px"; k.style.height = k.offsetHeight + "px";
     k.classList.add("drag");
     document.body.appendChild(k);
@@ -440,13 +477,13 @@ button:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
     const r = cur.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     let best = null, bd = 1e9;
+    const u = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--u")) || 40;
+    const lim = Math.max(u * .75, 18);                     // наскільки близько треба піднести
     slots.forEach(s => {
       if (!s.classList.contains("empty") || s.classList.contains("filled")) return;
-      const b = s.getBoundingClientRect(), p = 4;
-      if (cx >= b.left - p && cx <= b.right + p && cy >= b.top - p && cy <= b.bottom + p){
-        const d = Math.hypot(cx - (b.left + b.width / 2), cy - (b.top + b.height / 2));
-        if (d < bd){ bd = d; best = s; }
-      }
+      const b = s.getBoundingClientRect();
+      const d = Math.hypot(cx - (b.left + b.width / 2), cy - (b.top + b.height / 2));
+      if (d < lim && d < bd){ bd = d; best = s; }
     });
     if (best !== hot){
       if (hot){ hot.classList.remove("hot"); if (diff === "medium") hot.classList.remove("ghost"); }
